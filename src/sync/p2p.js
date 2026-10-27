@@ -3,8 +3,8 @@
 import { createSession } from './engine.js';
 import { uid } from '../util.js';
 import { deviceName } from '../store.js';
+import { stunList } from '../settings.js';
 
-const STUN = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
 const CHUNK = 15000;
 
 export const peers = new Map();
@@ -100,8 +100,8 @@ function wire(pc, dc, name) {
 }
 
 // Étape 1 (appareil A) : créer une invitation.
-export async function createInvite(useStun) {
-  const pc = new RTCPeerConnection({ iceServers: useStun ? STUN : [] });
+export async function createInvite() {
+  const pc = new RTCPeerConnection({ iceServers: stunList() });
   const dc = pc.createDataChannel('mythos', { ordered: true });
   await pc.setLocalDescription(await pc.createOffer());
   await waitIce(pc);
@@ -119,10 +119,10 @@ export async function createInvite(useStun) {
 }
 
 // Étape 2 (appareil B) : rejoindre avec le code de A, renvoie le code réponse.
-export async function joinInvite(code, useStun) {
+export async function joinInvite(code) {
   const { desc, name } = await decodeSignal(code);
   if (desc.type !== 'offer') throw new Error("Ce code n'est pas une invitation");
-  const pc = new RTCPeerConnection({ iceServers: useStun ? STUN : [] });
+  const pc = new RTCPeerConnection({ iceServers: stunList() });
   pc.ondatachannel = (e) => wire(pc, e.channel, name);
   await pc.setRemoteDescription(desc);
   await pc.setLocalDescription(await pc.createAnswer());

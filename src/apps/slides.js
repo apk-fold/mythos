@@ -4,6 +4,7 @@ import * as Y from 'yjs';
 import { h, uid, saveFile, safeName, pickFile, readAsDataURL, downscaleImage, toast } from '../util.js';
 import { tbtn, sep, sel, colorBtn, icon } from '../ui/toolbar.js';
 import { exportPptx } from '../io/pptx.js';
+import * as S from '../settings.js';
 
 export const SW = 960, SH = 540;
 
@@ -59,8 +60,9 @@ function layout(kind, t) {
 }
 
 export function initSlides(doc) {
-  doc.getMap('props').set('theme', 'clair');
-  doc.getArray('slides').push([slideMap({ bg: THEMES.clair.bg }, layout('title', THEMES.clair))]);
+  const key = THEMES[S.get('slidesTheme')] ? S.get('slidesTheme') : 'clair';
+  doc.getMap('props').set('theme', key);
+  doc.getArray('slides').push([slideMap({ bg: THEMES[key].bg }, layout('title', THEMES[key]))]);
 }
 
 // ---- Rendu d'une diapositive (partagé : éditeur, miniatures, présentation, export PDF) ----
@@ -456,7 +458,7 @@ export function mountSlides(root, { doc, meta }) {
     const inner = h('div', { class: 'slide' });
     const frame = h('div', { class: 'present-frame' }, inner);
     const counter = h('div', { class: 'present-count' });
-    const ov = h('div', { class: 'present', tabindex: 0 }, frame, counter);
+    const ov = h('div', { class: 'present', tabindex: 0, 'data-transition': S.get('transition') }, frame, counter);
     const show = () => {
       inner.replaceChildren();
       renderSlide(list[i], inner, {});

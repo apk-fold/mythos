@@ -7,6 +7,7 @@ import { openSyncPanel } from './sync/ui.js';
 import { peers, onPeersChange } from './sync/p2p.js';
 import { startFolderSync, status as folderStatus } from './sync/folder.js';
 import { importBundle } from './sync/engine.js';
+import * as S from './settings.js';
 
 const app = document.getElementById('app');
 let current = null;
@@ -97,18 +98,24 @@ function renderHome() {
   const search = h('input', { class: 'field search', placeholder: 'Rechercher…', oninput: () => { query = search.value.toLowerCase(); draw(); } });
   const sb = syncButton();
 
+  const stats = h('div', { class: 'hero-stats' });
   const draw = () => {
+    stats.replaceChildren(...['doc', 'sheet', 'slides'].map((t) => h('span', { class: 'stat', title: TYPES[t].label + 's', style: { '--c': TYPES[t].color } },
+      icon(t, 16), h('b', null, String(listDocs().filter((d) => d.type === t).length)))));
     tabsEl.replaceChildren(...[['all', 'Tout'], ['doc', 'Documents'], ['sheet', 'Classeurs'], ['slides', 'Présentations']].map(([k, l]) =>
       h('button', { class: 'chip' + (filter === k ? ' on' : ''), onclick: () => { filter = k; localStorage.setItem('mythos.filter', k); draw(); } }, l)));
+    const order = { modified: (a, b) => b.modified - a.modified, title: (a, b) => a.title.localeCompare(b.title, 'fr'), type: (a, b) => a.type.localeCompare(b.type) || b.modified - a.modified }[S.get('homeSort')];
     const docs = listDocs().filter((d) => (filter === 'all' || d.type === filter) && (!query || d.title.toLowerCase().includes(query)));
-    list.replaceChildren(...(docs.length ? docs.map((d) => h('div', { class: 'doc-row', role: 'link', tabindex: 0, onclick: () => (location.hash = '#/d/' + d.id), onkeydown: (e) => e.key === 'Enter' && (location.hash = '#/d/' + d.id) },
+    if (order) docs.sort(order);
+    list.className = 'doc-list' + (S.get('homeView') === 'grid' ? ' grid' : '');
+    list.replaceChildren(...(docs.length ? docs.map((d) => h('div', { class: 'doc-row', style: { '--c': TYPES[d.type]?.color }, role: 'link', tabindex: 0, onclick: () => (location.hash = '#/d/' + d.id), onkeydown: (e) => e.key === 'Enter' && (location.hash = '#/d/' + d.id) },
       h('span', { class: 'doc-icon', style: { background: TYPES[d.type]?.color } }, icon(d.type, 20)),
       h('div', { class: 'doc-info' }, h('div', { class: 'doc-title' }, d.title), h('div', { class: 'doc-sub' }, `${TYPES[d.type]?.label} · modifié ${fmtDate(d.modified)}${d.by ? ' · ' + d.by : ''}`)),
       h('button', { class: 'icon-btn', title: 'Actions', onclick: (e) => { e.stopPropagation(); docMenu(d, e.currentTarget); } }, icon('more'))))
       : [h('div', { class: 'empty' }, h('p', null, query ? 'Aucun résultat.' : 'Aucun fichier pour l\'instant.'), !query && h('p', { class: 'muted' }, 'Créez un document ci-dessus ou importez un fichier Word, Excel ou PowerPoint.'))]));
   };
 
-  const card = (type, title, sub) => h('button', { class: 'new-card', onclick: () => newDoc(type) },
+  const card = (type, title, sub) => h('button', { class: 'new-card', style: { '--c': TYPES[type].color }, onclick: () => newDoc(type) },
     h('span', { class: 'new-icon', style: { background: TYPES[type].color } }, icon(type, 26)),
     h('span', { class: 'new-text' }, h('b', null, title), h('span', null, sub)));
 
@@ -117,8 +124,13 @@ function renderHome() {
       h('div', { class: 'brand' }, h('span', { class: 'logo' }, logo()), 'Mythos'),
       h('div', { class: 'grow' }),
       sb,
-      h('button', { class: 'btn ghost', title: 'Paramètres', onclick: settings }, icon('more'))),
+      h('a', { class: 'btn ghost', href: '#/settings', title: 'Paramètres' }, icon('gear'), h('span', { class: 'hide-sm' }, 'Paramètres'))),
     h('main', { class: 'home-main' },
+      h('section', { class: 'hero' },
+        h('div', null,
+          h('h1', null, greeting()),
+          h('p', null, 'Écrivez, calculez et présentez. Tout reste sur vos appareils et se synchronise sans serveur.')),
+        stats),
       h('section', { class: 'new-row' },
         card('doc', 'Document', 'Traitement de texte'),
         card('sheet', 'Classeur', 'Tableur et formules'),
@@ -139,44 +151,28 @@ function renderHome() {
   return { el: view, destroy: () => { off(); sb.cleanup(); } };
 }
 
+function greeting() {
+  const hr = new Date().getHours();
+  return hr < 5 ? 'Bonne nuit' : hr < 12 ? 'Bonjour' : hr < 18 ? 'Bon après-midi' : 'Bonsoir';
+}
+
 function docMenu(d, anchor) {
   const close = () => back.remove();
   const item = (ic, label, fn, cls) => h('button', { class: cls, onclick: () => { close(); fn(); } }, icon(ic, 16), label);
   const m = h('div', { class: 'menu-pop' },
     item('text', 'Renommer', async () => { const t = await ask('Renommer', d.title); if (t && t.trim()) updateMeta(d.id, { title: t.trim() }); }),
     item('copy', 'Dupliquer', () => duplicateDoc(d.id)),
-    item('trash', 'Supprimer', async () => { if (await confirmBox('Supprimer', `Supprimer « ${d.title} » sur tous les appareils synchronisés ?`, 'Supprimer')) deleteDoc(d.id); }, 'danger'));
+    item('trash', 'Supprimer', async () => { if (!S.get('confirmDelete') || await confirmBox('Supprimer', `Supprimer « ${d.title} » sur tous les appareils synchronisés ?`, 'Supprimer')) deleteDoc(d.id); }, 'danger'));
   const back = h('div', { class: 'menu-back', onclick: (e) => e.target === back && close() }, m);
   document.body.append(back);
   const r = anchor.getBoundingClientRect();
   Object.assign(m.style, { top: Math.min(r.bottom + 4, innerHeight - 160) + 'px', left: Math.max(8, r.right - 190) + 'px' });
 }
 
-function settings() {
-  const name = h('input', { class: 'field', value: deviceName() });
-  const themeSel = h('select', { class: 'field' }, [['auto', 'Automatique'], ['light', 'Clair'], ['dark', 'Sombre']].map(([v, l]) => h('option', { value: v, selected: (localStorage.getItem('mythos.theme') || 'auto') === v }, l)));
-  const m = modal('Paramètres', h('div', { class: 'stack' },
-    h('label', null, 'Nom de cet appareil (visible lors de la synchronisation)'), name,
-    h('label', null, 'Apparence'), themeSel,
-    h('div', { class: 'row end' }, h('button', { class: 'btn primary', onclick: () => {
-      localStorage.setItem('mythos.deviceName', name.value.trim() || deviceName());
-      localStorage.setItem('mythos.theme', themeSel.value);
-      applyTheme();
-      m.close();
-    } }, 'Enregistrer')),
-    h('p', { class: 'muted small' }, 'Mythos — suite bureautique locale et synchronisée sans serveur. Vos fichiers restent sur vos appareils.')));
-}
-
-function applyTheme() {
-  const t = localStorage.getItem('mythos.theme') || 'auto';
-  if (t === 'auto') delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = t;
-}
-
 function logo() {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   s.setAttribute('viewBox', '0 0 32 32');
-  s.innerHTML = '<rect x="3" y="3" width="26" height="26" rx="7" fill="var(--c-doc)"/><rect x="9" y="9" width="6" height="14" rx="2" fill="#fff"/><rect x="17" y="9" width="6" height="6" rx="2" fill="#fff" opacity=".85"/><rect x="17" y="17" width="6" height="6" rx="2" fill="#fff" opacity=".6"/>';
+  s.innerHTML = '<defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--c-slides)"/></linearGradient></defs><rect x="3" y="3" width="26" height="26" rx="7" fill="url(#lg)"/><rect x="9" y="9" width="6" height="14" rx="2" fill="#fff"/><rect x="17" y="9" width="6" height="6" rx="2" fill="#fff" opacity=".85"/><rect x="17" y="17" width="6" height="6" rx="2" fill="#fff" opacity=".6"/>';
   return s;
 }
 
@@ -215,14 +211,16 @@ let routeSeq = 0;
 async function route() {
   const seq = ++routeSeq;
   const m = /^#\/d\/(\w+)/.exec(location.hash);
-  const view = m ? await renderEditor(m[1]) : renderHome();
+  const view = m ? await renderEditor(m[1])
+    : location.hash.startsWith('#/settings') ? (await import('./ui/settingsPage.js')).renderSettings()
+    : renderHome();
   if (seq !== routeSeq) return view.destroy();
   current?.destroy();
   current = view;
   app.replaceChildren(view.el);
 }
 addEventListener('hashchange', route);
-applyTheme();
+S.apply();
 library.ready.then(route);
 startFolderSync();
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});

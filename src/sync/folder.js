@@ -3,6 +3,7 @@
 // aucun conflit d'écriture possible, la fusion est assurée par les CRDT.
 import { exportBundle, importBundle, BUNDLE_ORIGIN } from './engine.js';
 import { deviceId, onDocOpened } from '../store.js';
+import { get as setting, onSettings } from '../settings.js';
 
 const KEY = 'mythos.syncFolder';
 const own = `mythos-${deviceId}.mythos`;
@@ -46,7 +47,7 @@ export function startFolderSync() {
   seen = {};
   dirty = true;
   tick();
-  timer = setInterval(tick, 5000);
+  timer = setInterval(tick, setting('folderInterval') * 1000);
 }
 export function stopFolderSync() { clearInterval(timer); timer = null; }
 
@@ -65,3 +66,5 @@ export function forgetFolder() {
   emit();
 }
 export const syncNow = tick;
+
+onSettings((_v, patch) => { if ('folderInterval' in patch && timer) startFolderSync(); });

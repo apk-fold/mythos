@@ -1,6 +1,6 @@
 {
   "name": "mythos",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Suite bureautique locale synchronisée sans serveur",
   "main": "electron/main.cjs",
   "scripts": {

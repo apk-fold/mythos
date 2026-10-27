@@ -1,13 +1,13 @@
 // Panneau « Synchronisation » : appairage direct, dossier partagé et fichier .mythos.
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
-import { h, modal, toast, saveFile, pickFile, isElectron } from '../util.js';
+import { h, modal, toast, saveFile, pickFile, isElectron, confirmBox } from '../util.js';
 import { createInvite, joinInvite, peers, onPeersChange } from './p2p.js';
+import { newCode, hostWithCode, joinWithCode } from './code.js';
 import { exportBundle, importBundle } from './engine.js';
 import { status as folderStatus, onFolderStatus, chooseFolder, forgetFolder, syncNow } from './folder.js';
 import { deviceName } from '../store.js';
-
-const stunPref = () => localStorage.getItem('mythos.stun') !== '0';
+import * as S from '../settings.js';
 
 function codeBox(code) {
   const canvas = h('canvas', { class: 'qr' });
@@ -69,12 +69,12 @@ export function openSyncPanel() {
   renderPeers();
   const offPeers = onPeersChange(renderPeers);
 
-  const stun = h('input', { type: 'checkbox', checked: stunPref(), onchange: () => localStorage.setItem('mythos.stun', stun.checked ? '1' : '0') });
+  const stun = h('input', { type: 'checkbox', checked: S.get('stun'), onchange: () => S.set({ stun: stun.checked }) });
   const flow = h('div', { class: 'flow' });
 
   const invite = async () => {
     flow.replaceChildren(h('p', { class: 'muted' }, 'Préparation de l\'invitation…'));
-    const inv = await createInvite(stun.checked);
+    const inv = await createInvite();
     flow.replaceChildren(
       h('h4', null, '1. Sur l\'autre appareil, choisissez « Rejoindre » et scannez ce code'), codeBox(inv.code),
       h('h4', null, '2. Puis saisissez ici le code réponse qu\'il affiche'),
@@ -83,10 +83,54 @@ export function openSyncPanel() {
   const join = () => {
     flow.replaceChildren(h('h4', null, 'Saisissez le code d\'invitation de l\'autre appareil'),
       codeInput('Code d\'invitation…', async (c) => {
-        const j = await joinInvite(c, stun.checked);
+        const j = await joinInvite(c);
         flow.replaceChildren(h('h4', null, 'Montrez ce code réponse à l\'autre appareil'), codeBox(j.code),
           h('p', { class: 'muted' }, 'La synchronisation démarre dès que l\'autre appareil l\'a saisi.'));
       }));
+  };
+
+  let pairing = null;
+  const stopPairing = () => { pairing?.cancel(); pairing = null; };
+  const status = (p) => (t) => (p.textContent = t);
+  const hostCode = async () => {
+    stopPairing();
+    const code = newCode();
+    const st = h('p', { class: 'muted' }, 'Préparation…');
+    flow.replaceChildren(h('h4', null, 'Saisissez ce code sur l\'autre appareil'),
+      h('div', { class: 'pin-show' }, ...code.split('').map((c) => h('span', null, c))), st,
+      h('div', { class: 'row center' }, h('button', { class: 'btn', onclick: hostCode }, 'Nouveau code'),
+        h('button', { class: 'btn ghost', onclick: () => { stopPairing(); flow.replaceChildren(); } }, 'Annuler')));
+    try {
+      pairing = await hostWithCode(code, {
+        onStatus: status(st),
+        confirm: (name) => !S.get('pairConfirm') || confirmBox('Nouvel appareil', `« ${name} » demande à se synchroniser avec cet appareil. Accepter ?`, 'Accepter'),
+      });
+    } catch (e) { st.textContent = 'Erreur : ' + (e.message || e); }
+  };
+  const joinCode = () => {
+    stopPairing();
+    const n = S.get('codeDigits') === 6 ? 6 : 4;
+    const st = h('p', { class: 'muted' });
+    const go = async () => {
+      const code = boxes.map((b) => b.value).join('');
+      if (code.length !== n) return;
+      boxes.forEach((b) => (b.disabled = true));
+      try { pairing = await joinWithCode(code, { onStatus: status(st) }); }
+      catch (e) { st.textContent = e.message || String(e); boxes.forEach((b) => { b.disabled = false; b.value = ''; }); boxes[0].focus(); }
+    };
+    const boxes = Array.from({ length: n }, (_, i) => h('input', { class: 'pin-box', inputmode: 'numeric', maxlength: n, autocomplete: 'off',
+      oninput: (e) => {
+        const v = e.target.value.replace(/\D/g, '');
+        // Un code collé d'un coup remplit les cases suivantes.
+        v.split('').slice(0, n - i).forEach((c, k) => (boxes[i + k].value = c));
+        if (!v) e.target.value = '';
+        const next = boxes.find((b) => !b.value);
+        (next || boxes[n - 1]).focus();
+        if (!next) go();
+      },
+      onkeydown: (e) => { if (e.key === 'Backspace' && !e.target.value && i) boxes[i - 1].focus(); } }));
+    flow.replaceChildren(h('h4', null, `Saisissez le code à ${n} chiffres affiché sur l'autre appareil`), h('div', { class: 'pin-in' }, ...boxes), st);
+    boxes[0].focus();
   };
 
   const folderBox = h('div', { class: 'stack' });
@@ -112,7 +156,11 @@ export function openSyncPanel() {
     h('section', null, h('h3', null, 'Appareils connectés'), peerList),
     h('section', null, h('h3', null, 'Appairage direct'),
       h('p', { class: 'muted' }, 'Connexion d\'appareil à appareil (Wi-Fi local ou Internet). Synchronisation en temps réel tant que l\'application reste ouverte.'),
-      h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: invite }, 'Inviter un appareil'), h('button', { class: 'btn', onclick: join }, 'Rejoindre')),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn primary', onclick: hostCode }, 'Afficher un code'),
+        h('button', { class: 'btn primary', onclick: joinCode }, 'Saisir un code')),
+      h('details', { class: 'more' }, h('summary', null, 'Sans Internet : QR code ou code long'),
+        h('div', { class: 'row' }, h('button', { class: 'btn', onclick: invite }, 'Inviter un appareil'), h('button', { class: 'btn', onclick: join }, 'Rejoindre'))),
       h('label', { class: 'check' }, stun, ' Autoriser la connexion via Internet (utilise un serveur STUN public uniquement pour découvrir l\'adresse ; aucune donnée n\'y transite)'),
       flow),
     h('section', null, h('h3', null, 'Dossier partagé'),
@@ -128,5 +176,5 @@ export function openSyncPanel() {
           try { const n = await importBundle(await f.text()); toast(`${n} document(s) fusionné(s)`); } catch (e) { toast('Erreur : ' + e.message); }
         } }, 'Importer'))));
 
-  modal('Synchronisation', body, { wide: true, onClose: () => { offPeers(); offFolder(); } });
+  modal('Synchronisation', body, { wide: true, onClose: () => { stopPairing(); offPeers(); offFolder(); } });
 }

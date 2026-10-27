@@ -1,5 +1,18 @@
 # Mythos — suite bureautique locale, synchronisée sans serveur
 
+![Accueil](docs/screenshots/home.png)
+
+| Texte | Tableur | Présentations |
+|---|---|---|
+| ![](docs/screenshots/writer.png) | ![](docs/screenshots/sheet.png) | ![](docs/screenshots/slides.png) |
+
+| Paramètres | Mode sombre |
+|---|---|
+| ![](docs/screenshots/settings.png) | ![](docs/screenshots/home-dark.png) |
+
+**Synchronisation par code à 4 chiffres** : sur un appareil, *Synchronisation → Afficher un code*, sur l'autre, *Saisir un code*. Le code ne sert qu'à se retrouver sur un relais (ntfy.sh, modifiable dans les Paramètres), et l'invitation y est chiffrée. Vos documents passent ensuite directement d'un appareil à l'autre.
+
+
 Traitement de texte, tableur et présentations dans une seule application, pour **Windows, Linux et Android**.
 Les fichiers restent sur vos appareils ; la synchronisation se fait directement d'appareil à appareil.
 
@@ -7,8 +20,8 @@ Les fichiers restent sur vos appareils ; la synchronisation se fait directement 
 
 | Système | Fichier | Emplacement |
 |---|---|---|
-| Windows | `Mythos-Setup-1.0.0.exe` (installeur) ou `Mythos-Portable-1.0.0.exe` | `release/` |
-| Linux | `Mythos-1.0.0-x64.tar.gz` (extraire puis lancer `./mythos`) ; l'AppImage se compile depuis Linux avec `npm run dist:linux` | `release/` |
+| Windows | `Mythos-Setup-1.1.0.exe` (installeur) ou `Mythos-Portable-1.1.0.exe` | `release/` |
+| Linux | `Mythos-1.1.0-x64.tar.gz` (extraire puis lancer `./mythos`) ; l'AppImage se compile depuis Linux avec `npm run dist:linux` | `release/` |
 | Android | `app-debug.apk` | `android/app/build/outputs/apk/debug/` |
 
 Les fichiers ne sont pas signés : Windows SmartScreen demandera « Informations complémentaires → Exécuter quand même »,

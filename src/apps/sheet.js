@@ -5,8 +5,9 @@ import { h, toast, ask, confirmBox, saveFile, safeName } from '../util.js';
 import { createEngine, formatValue, colName, cellName, parseRef, mapRefs, shiftFormula, FORMATS, FUNCTION_NAMES } from './formula.js';
 import { newSheetMap, exportSpreadsheet } from '../io/xlsx.js';
 import { icon, tbtn, colorBtn, sep, sel } from '../ui/toolbar.js';
+import * as S from '../settings.js';
 
-const DW = 100, DH = 24, HW = 48, HH = 24;
+const HW = 48, HH = 24;
 const key = (r, c) => r + ',' + c;
 
 export function initSheet(doc) {
@@ -74,11 +75,11 @@ export function mountSheet(root, { doc, meta }) {
     cells().forEach((_v, k) => { const i = k.indexOf(','); maxR = Math.max(maxR, +k.slice(0, i)); maxC = Math.max(maxC, +k.slice(i + 1)); });
     nRows = Math.max(100, maxR + 50, act.r + 20) + extraRows;
     nCols = Math.max(26, maxC + 6, act.c + 4) + extraCols;
-    const cw = sheet.get('cols'), rh = sheet.get('rows');
+    const cw = sheet.get('cols'), rh = sheet.get('rows'), DW = S.get('sheetColW');
     colX = new Float64Array(nCols + 1);
     for (let c = 0; c < nCols; c++) colX[c + 1] = colX[c] + (resizing?.t === 'c' && resizing.i === c ? resizing.size : cw.get(String(c)) ?? DW);
     rowY = new Float64Array(nRows + 1);
-    for (let r = 0; r < nRows; r++) rowY[r + 1] = rowY[r] + (resizing?.t === 'r' && resizing.i === r ? resizing.size : rh.get(String(r)) ?? DH);
+    for (let r = 0; r < nRows; r++) rowY[r + 1] = rowY[r] + (resizing?.t === 'r' && resizing.i === r ? resizing.size : rh.get(String(r)) ?? S.get('sheetRowH'));
     spacer.style.width = HW + colX[nCols] + 'px';
     spacer.style.height = HH + rowY[nRows] + 'px';
   }
@@ -118,10 +119,12 @@ export function mountSheet(root, { doc, meta }) {
       if (s?.bg) { g.fillStyle = s.bg; g.fillRect(X(c), Yp(r), colX[c + 1] - colX[c], rowY[r + 1] - rowY[r]); }
     }
     // quadrillage
-    g.strokeStyle = C.line; g.lineWidth = 1; g.beginPath();
-    for (let c = c0; c <= c1; c++) { const x = Math.round(X(c)) + 0.5; g.moveTo(x, HH); g.lineTo(x, H); }
-    for (let r = r0; r <= r1; r++) { const y = Math.round(Yp(r)) + 0.5; g.moveTo(HW, y); g.lineTo(W, y); }
-    g.stroke();
+    if (S.get('sheetGrid')) {
+      g.strokeStyle = C.line; g.lineWidth = 1; g.beginPath();
+      for (let c = c0; c <= c1; c++) { const x = Math.round(X(c)) + 0.5; g.moveTo(x, HH); g.lineTo(x, H); }
+      for (let r = r0; r <= r1; r++) { const y = Math.round(Yp(r)) + 0.5; g.moveTo(HW, y); g.lineTo(W, y); }
+      g.stroke();
+    }
     // textes
     g.textBaseline = 'middle';
     for (let r = r0; r < r1; r++) {
@@ -133,7 +136,7 @@ export function mountSheet(root, { doc, meta }) {
         const txt = s.fmt === 'text' ? String(cell.v) : formatValue(v, s.fmt);
         if (!txt) continue;
         const align = s.align || (typeof v === 'number' ? 'right' : typeof v === 'boolean' || engine.isErr(v) ? 'center' : 'left');
-        g.font = `${s.i ? 'italic ' : ''}${s.b ? '600 ' : ''}13px ${css('--font-ui')}`;
+        g.font = `${s.i ? 'italic ' : ''}${s.b ? '600 ' : ''}${S.get('sheetFont')}px ${css('--font-ui')}`;
         g.fillStyle = engine.isErr(v) ? '#e03131' : s.color || C.text;
         const x = X(c), y = Yp(r), w = colX[c + 1] - colX[c], hgt = rowY[r + 1] - rowY[r];
         let cw = w;
@@ -389,7 +392,7 @@ export function mountSheet(root, { doc, meta }) {
 
   function autoFitCol(c) {
     const g = canvas.getContext('2d');
-    g.font = `13px ${css('--font-ui')}`;
+    g.font = `${S.get('sheetFont')}px ${css('--font-ui')}`;
     let w = 40;
     cells().forEach((cell, k) => { if (+k.split(',')[1] === c) w = Math.max(w, g.measureText(formatValue(engine.value(sheet, +k.split(',')[0], c), cell.s?.fmt)).width + 14); });
     sheet.get('cols').set(String(c), Math.min(600, Math.ceil(w)));

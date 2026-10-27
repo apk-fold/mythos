@@ -11,6 +11,7 @@ import Image from '@tiptap/extension-image';
 import { h, saveFile, safeName, pickFile, readAsDataURL, downscaleImage, ask, toast } from '../util.js';
 import { tbtn, sep, sel, colorBtn } from '../ui/toolbar.js';
 import { exportDocx } from '../io/docx.js';
+import * as S from '../settings.js';
 
 const PageBreak = Node.create({
   name: 'pageBreak',
@@ -49,7 +50,7 @@ export function mountWriter(root, { doc, id, meta }) {
       Image.configure({ allowBase64: true }),
       PageBreak,
     ],
-    editorProps: { attributes: { class: 'prose', spellcheck: 'true' } },
+    editorProps: { attributes: { class: 'prose', spellcheck: S.get('spellcheck') ? 'true' : 'false' } },
   });
 
   const chain = () => editor.chain().focus();
