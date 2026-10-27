@@ -1,0 +1,34 @@
+// Test de fumée : ouvre l'app, crée un document de chaque type et capture l'écran.
+const { app, BrowserWindow } = require('electron');
+const path = require('path'); const fs = require('fs');
+const out = process.env.SHOTS;
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
+app.setPath('userData', path.join(out, 'profile'));
+require('./main.cjs');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+app.whenReady().then(async () => {
+  await wait(1500);
+  const win = BrowserWindow.getAllWindows()[0];
+  const errs = [];
+  win.webContents.on('console-message', (e) => { const m = e.message ?? e; if ((e.level ?? 0) >= 2 || /error/i.test(String(m))) errs.push(String(m)); });
+  const js = (s) => win.webContents.executeJavaScript(s);
+  const shot = async (n) => { await wait(900); fs.writeFileSync(path.join(out, n + '.png'), (await win.webContents.capturePage()).toPNG()); };
+  await shot('1-home');
+  await js(`document.querySelectorAll('.new-card')[0].click()`); await wait(1200);
+  await js(`(async()=>{const ed=document.querySelector('.prose'); ed.focus(); document.execCommand('insertText',false,'Rapport annuel'); })()`);
+  await shot('2-writer');
+  await js(`location.hash='#/'`); await wait(600);
+  await js(`document.querySelectorAll('.new-card')[1].click()`); await wait(1200);
+  await js(`(async()=>{const s=document.querySelector('.grid-scroller'); const type=(t)=>{s.dispatchEvent(new KeyboardEvent('keydown',{key:t[0],bubbles:true})); const ed=document.querySelector('.cell-editor'); ed.value=t; ed.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));}; for (const v of ['Produit','Pommes','Poires','Total']) type(v); })()`);
+  await js(`(async()=>{const s=document.querySelector('.grid-scroller'); s.focus(); s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})); const type=(t)=>{s.dispatchEvent(new KeyboardEvent('keydown',{key:t[0],bubbles:true})); const ed=document.querySelector('.cell-editor'); ed.value=t; ed.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));}; for (const v of ['Prix','12,5','8','=SOMME(B2:B3)']) type(v); })()`);
+  await shot('3-sheet');
+  await js(`location.hash='#/'`); await wait(600);
+  await js(`document.querySelectorAll('.new-card')[2].click()`); await wait(1500);
+  await shot('4-slides');
+  await js(`location.hash='#/'`); await wait(600);
+  await js(`document.querySelector('.sync-btn').click()`); await wait(400);
+  await js(`document.querySelector('.sync .btn.primary').click()`); await wait(2500);
+  await shot('5-sync');
+  fs.writeFileSync(path.join(out, 'errors.txt'), errs.join('\n'));
+  app.quit();
+});

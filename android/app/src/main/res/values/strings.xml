@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mythos</string>
+    <string name="title_activity_main">Mythos</string>
+    <string name="package_name">com.mythos.suite</string>
+    <string name="custom_url_scheme">com.mythos.suite</string>
+</resources>
