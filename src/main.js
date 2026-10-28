@@ -1,3 +1,4 @@
+import { initI18n } from './i18n.js';
 // Coquille de l'application : accueil (bibliothèque), routage et ouverture des éditeurs.
 import './styles.css';
 import { h, toast, ask, confirmBox, pickFile, modal } from './util.js';
@@ -9,6 +10,7 @@ import { startFolderSync, status as folderStatus } from './sync/folder.js';
 import { importBundle } from './sync/engine.js';
 import * as S from './settings.js';
 
+initI18n({ app: 'mythos', exclude: ['.doc-page', '.ProseMirror', '.tiptap', '.sheet-cell', '.slides-canvas'] });
 const app = document.getElementById('app');
 let current = null;
 
