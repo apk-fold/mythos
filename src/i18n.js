@@ -431,7 +431,7 @@ const APP_ROWS = [
   ["Synchro en cours…","Sync in progress…","Sincronización en curso…","Synchronisierung läuft…","Sincronizzazione in corso…","Sincronização em andamento…"],
   ["Synchronisation terminée","Sync complete","Sincronización completada","Synchronisierung abgeschlossen","Sincronizzazione completata","Sincronização concluída"],
   ["Appareil connecté","Device connected","Dispositivo conectado","Gerät verbunden","Dispositivo connesso","Dispositivo conectado"],
-  ["Aucun appareil connecté","No devices connected","No hay dispositivos conectados","Keine Geräte verbunden","Nessún dispositivo connesso","Nenhum dispositivo conectado"],
+  ["Aucun appareil connecté","No devices connected","No hay dispositivos conectados","Keine Geräte verbunden","Nessun dispositivo connesso","Nenhum dispositivo conectado"],
   ["Aucun résultat.","No results.","Sin resultados.","Keine Ergebnisse.","Nessun risultato.","Nenhum resultado."],
   ["Aucun fichier pour l'instant.","No files yet.","Todavía no hay archivos.","Noch keine Dateien.","Nessun file per ora.","Nenhum arquivo por enquanto."],
   ["Créer un document","Create a document","Crear un documento","Dokument erstellen","Crea un documento","Criar documento"],
